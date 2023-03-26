@@ -6,8 +6,6 @@ prototype for containerized k8s native email service
 
 ```bash
 GET /sending
-
-curl localhost:4000/sending
 ```
 
 ## test locally
