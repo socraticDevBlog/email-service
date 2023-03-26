@@ -30,3 +30,21 @@ Content-Length: 109
 
 {"id":1,"title":"Very Important Message!!!","email":"test@socratic.dev","content":"Lorem ipsum dipsum more"}
 ```
+
+## logging
+
+basic logging has been implemented with different severity levels:
+
+- ERROR: server is erroring, possibly down
+- WARNING: a http request was made to a non-existing endpoint
+- INFO: a http request to a valid endpoint
+- DEBUG: (future use) for tracing
+
+### logging - Docker
+
+```bash
+# print current email-service container ID
+docker ps
+
+docker logs <CONTAINER ID>
+```
