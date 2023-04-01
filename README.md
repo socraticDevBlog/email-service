@@ -31,6 +31,18 @@ Content-Length: 109
 {"id":1,"title":"Very Important Message!!!","email":"test@socratic.dev","content":"Lorem ipsum dipsum more"}
 ```
 
+### ping /publish endpoint
+
+```bash
+curl -X POST -d "msg=honhon" localhost:4000/publish
+```
+
+#### expect
+
+```bash
+{"id":1,"title":"PUBLISHED","email":"test@socratic.dev","content":"https://paste.c-net.org/StuffingPushed\n"}
+```
+
 ## logging
 
 basic logging has been implemented with different severity levels:

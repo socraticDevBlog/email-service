@@ -7,7 +7,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
+	"time"
 )
 
 var (
@@ -41,10 +44,60 @@ func Init(
 }
 
 type Message struct {
-	Id      int    `json:"id"`
-	Title   string `json:"title"`
-	Email   string `json:"email"`
-	Content string `json:"content"`
+	Id        int    `json:"id"`
+	Title     string `json:"title"`
+	Email     string `json:"email"`
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"`
+}
+
+func publish(res http.ResponseWriter, req *http.Request) {
+
+	// todo: future me: remove this logging calls from function body
+	InfoLogger.Printf("publish function called with route: %s", req.URL.Path)
+
+	inMsg := req.PostFormValue("msg")
+
+	params := url.Values{}
+
+	params.Add("message", req.PostFormValue(inMsg))
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	params.Add("datetime", now)
+	body := strings.NewReader(params.Encode())
+
+	req, err := http.NewRequest("POST", "https://paste.c-net.org/", body)
+	if err != nil {
+		res.WriteHeader(http.StatusNotAcceptable)
+		ErrorLogger.Println("Error building a message content:", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	respThirdParty, err := http.DefaultClient.Do(req)
+	if err != nil {
+		res.WriteHeader(http.StatusInternalServerError)
+		ErrorLogger.Println("Error publishing content:", err)
+	}
+
+	bod, err := ioutil.ReadAll(respThirdParty.Body)
+	if err != nil {
+		ErrorLogger.Println("Could not read response from third party: ", err)
+	}
+	defer respThirdParty.Body.Close()
+
+	res.WriteHeader(http.StatusOK)
+	msg := Message{
+		Id:        1,
+		Title:     "PUBLISHED",
+		Email:     "test@socratic.dev",
+		Content:   string(bod),
+		Timestamp: now,
+	}
+	json.NewEncoder(res).Encode(msg)
+
+	InfoLogger.Printf("successfully publish a message '%s' at %s", inMsg, now)
+
 }
 
 func sending(res http.ResponseWriter, req *http.Request) {
@@ -92,6 +145,8 @@ func main() {
 	InfoLogger.Println("Starting up email-service")
 
 	http.HandleFunc("/sending", sending)
+
+	http.HandleFunc("/publish", publish)
 
 	http.HandleFunc("/", defaultRoute)
 
