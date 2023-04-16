@@ -60,7 +60,6 @@ pick the latest and checks its logs:
 
 ```bash
 kubectl logs -n cron cron-email-service-28027965-xh4wv
-```
 
 ## expect
 # INFO: 2023/04/16 20:45:00 email-service.go:173: Starting up email-service
