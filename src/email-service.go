@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -51,18 +52,45 @@ type Message struct {
 	Timestamp string `json:"timestamp"`
 }
 
+func cronPublish(msg string) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	InfoLogger.Printf("now string is: %s", now)
+
+	params := url.Values{}
+	params.Add("datetime", now)
+	params.Add("message", msg)
+
+	body := strings.NewReader(params.Encode())
+
+	req, err := http.NewRequest("POST", "https://paste.c-net.org/", body)
+	if err != nil {
+		ErrorLogger.Println("Error building a message content:", err)
+	}
+
+	respThirdParty, err := http.DefaultClient.Do(req)
+	if err != nil {
+		ErrorLogger.Println("Error publishing content:", err)
+	}
+	bod, err := ioutil.ReadAll(respThirdParty.Body)
+	if err != nil {
+		ErrorLogger.Println("Could not read response from third party: ", err)
+	}
+	defer respThirdParty.Body.Close()
+
+	InfoLogger.Printf("successfully posted cronmessage %s", strings.TrimSpace(bytes.NewBuffer(bod).String()))
+}
+
 func publish(res http.ResponseWriter, req *http.Request) {
 
 	// todo: future me: remove this logging calls from function body
 	InfoLogger.Printf("publish function called with route: %s", req.URL.Path)
 
-	inMsg := req.PostFormValue("msg")
-
 	params := url.Values{}
-
-	params.Add("message", req.PostFormValue(inMsg))
+	inMsg := req.PostFormValue("msg")
+	params.Add("message", inMsg)
 
 	now := time.Now().UTC().Format(time.RFC3339)
+	InfoLogger.Printf("now string is: %s", now)
 	params.Add("datetime", now)
 	body := strings.NewReader(params.Encode())
 
@@ -91,7 +119,7 @@ func publish(res http.ResponseWriter, req *http.Request) {
 		Id:        1,
 		Title:     "PUBLISHED",
 		Email:     "test@socratic.dev",
-		Content:   string(bod),
+		Content:   strings.TrimSpace(bytes.NewBuffer(bod).String()),
 		Timestamp: now,
 	}
 	json.NewEncoder(res).Encode(msg)
@@ -143,6 +171,9 @@ func main() {
 	Init(ioutil.Discard, os.Stdout, os.Stdout, os.Stderr)
 
 	InfoLogger.Println("Starting up email-service")
+
+	InfoLogger.Println("trigger a cronmessage function")
+	cronPublish("publish my cron message")
 
 	http.HandleFunc("/sending", sending)
 

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: null
+  name: cron
+spec: {}
+status: {}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-email-service
+  namespace: cron
+spec:
+  schedule: "*/5 * * * *" #every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: cron-email-service
+              image: email-service:latest
+              imagePullPolicy: IfNotPresent
+              command:
+          restartPolicy: OnFailure
