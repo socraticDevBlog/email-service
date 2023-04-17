@@ -1,85 +1,123 @@
-# email-service
 
-prototype for containerized k8s native email service
+# scheduled email-service 
 
-## routes
+economically sending emails to a third party on a schedule using kubernetes cronJob service
 
-```bash
-GET /sending
-```
 
-## test locally
 
-### build Docker image, run it, and ping /sending endpoint
+## Features
 
-```bash
-docker build . -t email-service:local
+- straightforward instructions on developing and running service locally; on an actual kubernetes environment
+- showcases Go app and kubernetes potential
 
-docker run -p 4000:4000 -d -t email-service:local
 
-curl -i localhost:4000/sending
-```
 
-### expect
+## Installation
 
-```bash
-HTTP/1.1 200 OK
-Content-Type: application/json
-Date: {now}
-Content-Length: 109
+** make sure you have Docker engine running on your local machine (we enjoy
+using Desktop engine)
 
-{"id":1,"title":"Very Important Message!!!","email":"test@socratic.dev","content":"Lorem ipsum dipsum more"}
-```
-
-### ping /publish endpoint
-
-```bash
-curl -X POST -d "msg=honhon" localhost:4000/publish
-```
-
-#### expect
-
-```bash
-{"id":1,"title":"PUBLISHED","email":"test@socratic.dev","content":"https://paste.c-net.org/StuffingPushed\n"}
-```
-
-## logging
-
-basic logging has been implemented with different severity levels:
-
-- ERROR: server is erroring, possibly down
-- WARNING: a http request was made to a non-existing endpoint
-- INFO: a http request to a valid endpoint
-- DEBUG: (future use) for tracing
-
-### logging - Docker
-
-```bash
-# print current email-service container ID
-docker ps
-
-docker logs <CONTAINER ID>
-```
-
-## minikube - running `email-service` on local kubernetes cluster
-
-I like to use Minikube to develop k8s native service on local machine:
+Use Minikube to develop k8s native service on local machine:
 <https://minikube.sigs.k8s.io/docs/start/>
 
-using Minikube requires some extra configs to make your container image
-available to k8s runtime- see local file ([minikube-setup.sh](minikube-setup.sh)):
+1. start Minikube:
+```bash
+minikube start
+```
+1. set Docker environment to be running within Minikube:
+```bash
+eval $(minikube docker-env)
+```
+1. build your container image within Minikube:
+```bash
+docker build -t email-service:latest .
+```
 
-0. start Minikube
-1. set Docker environment to be running within Minikube
-2. build your container image within Minikube
+    
+## Demo
+
+On Unix/linux systems, CronJob is a built-in service for performing regular
+scheduled actions such as backups, report generation, and so on.
+
+For this project, we are naively using kubernetes built-in cronJob service to
+post a message to a third party API.
+
+Since scheduled jobs differ from regular microservices hosted on a k8s cluster,
+you may **not want** to use cronJobs to push data to your customers. You've been
+warned ;)
+
+### What does this proof-of-concept does?
+
+Let's start by the small Go programm `email-service.go`
+
+From the `main()` entrypoint, it will trigger the function `cronPublish(<my
+message>)` and pass a message as input parameter.
+
+The `cronPublish` function will format a short message containing a datetime
+(now) and append the message supplied in the function call.
+
+We make this `cronPublish`function POST an HTTP request to a third party API.
+I had picked https://paste.c-net.org/ but any public pastebin site like
+Sprunge will work the same way.
+
+#### how to (on a linux or mac machine)
+
+** follow the previous Installation section to set yourself up on local machine
+
+deploy the cronJob to your cluster using kubectl: 
+```bash
+kubectl apply -f cronjob.yml
+```
+
+
+### validate cron service is up and running
 
 ```bash
-kubectl apply -f deployment.yml
+kubectl get -n cron all
 
-kubectl get pods
-
-# expect
-# > NAME                                       READY   STATUS    RESTARTS   AGE
-#   email-service-deployment-d9b4c95d9-h9bh9   1/1     Running   0          8s
-
+## expect
+# > NAME                 SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+#   cron-email-service   */5 * * * *   False     0        <none>          67s
 ```
+
+wait at least 5 minutes (job is scheduled to run every 5 minutes) and issue the
+previous command a second time
+
+```bash
+## expect
+# NAME                                    READY   STATUS    RESTARTS   AGE
+# pod/cron-email-service-28027965-xh4wv   1/1     Running   0          2m18s
+
+# NAME                               SCHEDULE      SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+# cronjob.batch/cron-email-service   */5 * * * *   False     1        2m18s           2m37s
+```
+
+use command `kubectl get pods -n cron` to list all cron service pods
+
+pick the latest and checks its logs:
+
+```bash
+kubectl logs -n cron cron-email-service-28027965-xh4wv
+
+## expect
+# INFO: 2023/04/16 20:45:00 email-service.go:173: Starting up email-service
+# INFO: 2023/04/16 20:45:00 email-service.go:175: trigger a cronmessage function
+# INFO: 2023/04/16 20:45:00 email-service.go:57: now string is: 2023-04-16T20:45:00Z
+# INFO: 2023/04/16 20:45:02 email-service.go:80: successfully posted cronmessage https://paste.c-net.org/SteeleSuppress
+```
+
+### before leaving for the day: delete your cronJob
+
+`kubectl delete -f cronjob.yml`
+
+and validate nothing is left running in your cluster: `kubectl get all -n cron`
+
+expect: "No resources found in cron namespace."
+
+
+## Roadmap
+
+- implement sending an actual email
+
+- implement sending an attachmed file with email
+
